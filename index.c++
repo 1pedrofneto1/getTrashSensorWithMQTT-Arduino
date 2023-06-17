@@ -4,23 +4,19 @@
 #include <WiFiClientSecure.h>
 #include <Ultrasonic.h>
 
-// Configurações da rede Wi-Fi
-const char* ssid = "TP-Link_Leo";
-const char* password = "ronald2019";
+const char* ssid = getenv("WIFI_SSID");
+const char* password = getenv("WIFI_PASSWORD");
 
-// Configurações do cliente MQTT
-const char* mqtt_broker = "a30a548eifp1pb-ats.iot.sa-east-1.amazonaws.com";  // Endpoint do AWS IoT Core
-const int mqtt_port = 8883;                                                  // Porta padrão para conexões MQTT seguras
-const char* mqtt_client_id = "lixeiro_esp32";                                // Preencha com o ID do cliente MQTT
+const char* mqtt_broker = getenv("MQTT_BROKER");  
+const int mqtt_port = atoi(getenv("MQTT_PORT"));                         
+const char* mqtt_client_id = getenv("MQTT_CLIENT_ID");   
 
-const char* topic_hx711_data = "HX711/data";     // Tópico para leitura de peso
-const char* topic_hcsr04_data = "HC-SR04/data";  // Tópico para leitura de nível
+const char* topic_hx711_data = "HX711/data";    
+const char* topic_hcsr04_data = "HC-SR04/data";  
 
-const char* topic_hx711_comm = "HX711/commands";     // Tópico para commandos do sensor de peso
-const char* topic_hcsr04_comm = "HC-SR04/commands";  // Tópico para commandos do sensor de nível
+const char* topic_hx711_comm = "HX711/commands";     
+const char* topic_hcsr04_comm = "HC-SR04/commands"; 
 
-// Configurações de autenticação
-// Amazon Root CA 1
 static const char AWS_CERT_CA[] PROGMEM = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF
@@ -43,7 +39,7 @@ o/ufQJVtMVT8QtPHRh8jrdkPSHCa2XV4cdFyQzR1bldZwgJcJmApzyMZFo6IQ6XU
 rqXRfboQnoZsG4q5WTP468SQvvG5
 -----END CERTIFICATE-----
 )EOF";
-// Device Private Key
+
 static const char AWS_CERT_PRIVATE[] PROGMEM = R"KEY(
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEA508OiVQHEi9Hz8rUJ20IVlBZjKWTZx+7/P1lXrFQcHtmcsQM
@@ -73,7 +69,7 @@ UdeYvrHRiaZMVVfGJ4cBJnnz6bzgtet3Rw2qxCRI4XIfzWEI6ue0gPfx86RK0s8v
 EOpvsZ11ZTkHjMDjMyQudti0JkOVUpbzu/D7ptJdLZrYGjID2UDP6a0=
 -----END RSA PRIVATE KEY-----
 )KEY";
-// Device Certificate
+
 static const char AWS_CERT_CRT[] PROGMEM = R"KEY(
 -----BEGIN CERTIFICATE-----
 MIIDWjCCAkKgAwIBAgIVAINZcH0OswfBkMirXk13WtgNRlQMMA0GCSqGSIb3DQEB
@@ -97,24 +93,22 @@ MF4VqjQ1SHYqB7xF2tc1ZDgQRiGnSWPqJC9qS08xEtAt8xwXAqdzdOu9HZ1Sh67T
 -----END CERTIFICATE-----
 )KEY";
 
-// Pinos do HX711
 #define DT_PIN 4
 #define SCK_PIN 5
 
-// Pinos do HC-SR04
 #define TRIGGER_PIN 13
 #define ECHO_PIN 12
 
 HX711 hx711;
 Ultrasonic ultrasonic(TRIGGER_PIN, ECHO_PIN);
 
-bool hx711_sensor_active = false;  // Variavel on/off do HX711
-bool sr04_sensor_active = false;   // Variavel on/off do HC-SR04
+bool hx711_sensor_active = false;  
+bool sr04_sensor_active = false;  
 
-float calibration_factor = 101820;  // Fator de Calibração do lixeiro
+float calibration_factor = 101820; 
 
-WiFiClientSecure espClient;          // Criando cliente de conexão segura (TLS/SSL)
-PubSubClient mqttClient(espClient);  // Conexão ao broker MQTT usando o cliente de conexão segura
+WiFiClientSecure espClient; 
+PubSubClient mqttClient(espClient); 
 
 //
 unsigned long previousMillis_hx711 = 0;
@@ -123,7 +117,6 @@ const long interval_hx711 = 5000;
 const long interval_hcsr04 = 5000;
 
 void reconnect() {
-  // Loop até que o cliente MQTT esteja conectado
   while (!mqttClient.connected()) {
     Serial.println("Conectando ao broker MQTT...");
     if (mqttClient.connect(mqtt_client_id)) {
@@ -142,16 +135,13 @@ void reconnect() {
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // Converter o payload em uma string
   String message = "";
   for (int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
 
-  // Verificar o tópico da mensagem
   if (strcmp(topic, "HX711/commands") == 0) {
     Serial.printf("tópico : %s | mensagem : %s\n", topic, message);
-    // Processar a mensagem recebida no tópico "HX711/commands"
     if (message == "on") {
       hx711_sensor_active = true;
     } else if (message == "off") {
@@ -161,7 +151,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
   if (strcmp(topic, "HC-SR04/commands") == 0) {
     Serial.printf("tópico : %s | mensagem : %s\n", topic, message);
-    // Processar a mensagem recebida no tópico "HC-SR04/commands"
     if (message == "on") {
       sr04_sensor_active = true;
     } else if (message == "off") {
@@ -172,7 +161,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 void setup() {
   Serial.begin(115200);
-  // Conexão com a rede Wi-Fi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -180,19 +168,16 @@ void setup() {
   }
   Serial.println("Conectado ao Wi-Fi!");
 
-  // Configuração do cliente MQTT
   mqttClient.setServer(mqtt_broker, mqtt_port);
   mqttClient.setCallback(mqttCallback);
 
-  // Configuração da conexão segura MQTT
   espClient.setCACert(AWS_CERT_CA);
   espClient.setCertificate(AWS_CERT_CRT);
   espClient.setPrivateKey(AWS_CERT_PRIVATE);
 
-  // Configuração do HX711
   hx711.begin(DT_PIN, SCK_PIN);
-  hx711.tare();                         // Zera a balança
-  hx711.set_scale(calibration_factor);  // Ajusta fator de calibração
+  hx711.tare();                         
+  hx711.set_scale(calibration_factor);  
 }
 
 void loop() {
@@ -206,10 +191,9 @@ void loop() {
       if (currentMillis - previousMillis_hx711 >= interval_hx711) {
         previousMillis_hx711 = currentMillis;
 
-        float peso = hx711.get_units();  // Realizar leituras de peso em kg
+        float peso = hx711.get_units();  
         Serial.printf("| Peso: %.2f Kg\n", peso);
 
-        // Construção da mensagem MQTT
         String payload_hx711 = String(peso);
         mqttClient.publish(topic_hx711_data, payload_hx711.c_str());
       }
@@ -220,10 +204,9 @@ void loop() {
       if (currentMillis - previousMillis_hcsr04 >= interval_hcsr04) {
         previousMillis_hcsr04 = currentMillis;
 
-        unsigned int nivel = ultrasonic.read();  // Realiza a medição da distância em centímetros
+        unsigned int nivel = ultrasonic.read();  
         Serial.printf("| Nível: %d Cm\n", nivel);
 
-        // Construção da mensagem MQTT
         String payload_hcsr04 = String(nivel);
         mqttClient.publish(topic_hcsr04_data, payload_hcsr04.c_str());
       }
