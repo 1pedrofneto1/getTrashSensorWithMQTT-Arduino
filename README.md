@@ -15,6 +15,9 @@ You need to run init.bat file to use environment variables.
 - MQTT_BROKER (YOUR_MQTT_BROKER_HERE)
 - MQTT_PORT (YOUR_MQTT_PORT)
 - MQTT_CLIENT_ID (YOUR_MQTT_CLIENT_ID_HERE)
+- AWS_KEY (AWS_KEY_FILE_PATH)
+- AWS_CERTIFICATE (AWS_CERTIFICATE_FILE_PATH)
+- AWS_CA (AWS_CA_FILE_PATH)
 
 # Dependencies 💻
 
